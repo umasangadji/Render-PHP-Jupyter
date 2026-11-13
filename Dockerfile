@@ -80,6 +80,7 @@ RUN sed -i \
         's|^;*daemonize = .*|daemonize = no|' \
         /etc/php/8.3/fpm/php-fpm.conf && \
     sed -i 's|^;*pid = .*|pid = /tmp/php-fpm.pid|' /etc/php/8.3/fpm/php-fpm.conf && \
+    sed -i 's|^;*error_log = .*|error_log = /proc/self/fd/2|' /etc/php/8.3/fpm/php-fpm.conf && \
     sed -i 's|^pm.max_children = .*|pm.max_children = 2|' /etc/php/8.3/fpm/pool.d/www.conf && \
     sed -i 's|^pm.start_servers = .*|pm.start_servers = 1|' /etc/php/8.3/fpm/pool.d/www.conf && \
     sed -i 's|^pm.min_spare_servers = .*|pm.min_spare_servers = 1|' /etc/php/8.3/fpm/pool.d/www.conf && \
