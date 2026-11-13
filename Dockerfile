@@ -53,11 +53,18 @@ RUN useradd -m -s /bin/bash jovyan && \
         /tmp/nginx-client \
         /tmp/nginx-proxy \
         /tmp/nginx-fastcgi \
+        /tmp/nginx-uwsgi \
+        /tmp/nginx-scgi \
         /run/php \
     && chown -R jovyan:jovyan \
         /home/jovyan \
         /var/www/html \
-        /run/php
+        /run/php \
+        /tmp/nginx-client \
+        /tmp/nginx-proxy \
+        /tmp/nginx-fastcgi \
+        /tmp/nginx-uwsgi \
+        /tmp/nginx-scgi
 
 # Configure PHP-FPM to run without root privileges
 RUN sed -i \
@@ -72,8 +79,11 @@ RUN sed -i \
     sed -i \
         's|^;*daemonize = .*|daemonize = no|' \
         /etc/php/8.3/fpm/php-fpm.conf && \
-    printf '\n[global]\npid = /tmp/php-fpm.pid\n' \
-        >> /etc/php/8.3/fpm/php-fpm.conf
+    sed -i 's|^;*pid = .*|pid = /tmp/php-fpm.pid|' /etc/php/8.3/fpm/php-fpm.conf && \
+    sed -i 's|^pm.max_children = .*|pm.max_children = 2|' /etc/php/8.3/fpm/pool.d/www.conf && \
+    sed -i 's|^pm.start_servers = .*|pm.start_servers = 1|' /etc/php/8.3/fpm/pool.d/www.conf && \
+    sed -i 's|^pm.min_spare_servers = .*|pm.min_spare_servers = 1|' /etc/php/8.3/fpm/pool.d/www.conf && \
+    sed -i 's|^pm.max_spare_servers = .*|pm.max_spare_servers = 1|' /etc/php/8.3/fpm/pool.d/www.conf
 
 # Copy Nginx configuration and website files
 COPY nginx.conf /etc/nginx/nginx.conf
