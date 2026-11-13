@@ -12,8 +12,26 @@ RUN apt-get update && \
         nano \
         ca-certificates \
         zip \
+        nginx \
+        php-cli \
+        php-fpm \
+        php-common \
+        php-curl \
+        php-mbstring \
+        php-xml \
+        php-zip \
+        php-sqlite3 \
+        php-mysql \
+        php-pgsql \
+        php-gd \
+        php-intl \
+        php-bcmath \
+        php-opcache \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
+
+# Verify PHP and Nginx are installed during build
+RUN php -v && nginx -v
 
 # Return to the normal Jupyter user
 USER ${NB_UID}
