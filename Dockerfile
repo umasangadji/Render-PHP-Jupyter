@@ -1,50 +1,97 @@
-FROM quay.io/jupyter/base-notebook:latest
-
-# Install system packages as root during image build
-USER root
-
+FROM ubuntu:24.04
+ENV DEBIAN_FRONTEND=noninteractive \
+    TZ=Etc/UTC \
+    PYTHONUNBUFFERED=1 \
+    PORT=10000
+# Install system packages, PHP 8.3, Nginx and Python
 RUN apt-get update && \
     apt-get install -y --no-install-recommends \
-        git \
+        ca-certificates \
         curl \
         wget \
+        git \
         unzip \
-        nano \
-        ca-certificates \
         zip \
+        nano \
+        bash \
+        tini \
         nginx \
-        php-cli \
-        php-fpm \
-        php-common \
-        php-curl \
-        php-mbstring \
-        php-xml \
-        php-zip \
-        php-sqlite3 \
-        php-mysql \
-        php-pgsql \
-        php-gd \
-        php-intl \
-        php-bcmath \
-        php-opcache \
+        python3 \
+        python3-pip \
+        python3-venv \
+        php8.3-cli \
+        php8.3-fpm \
+        php8.3-common \
+        php8.3-curl \
+        php8.3-mbstring \
+        php8.3-xml \
+        php8.3-zip \
+        php8.3-sqlite3 \
+        php8.3-mysql \
+        php8.3-pgsql \
+        php8.3-gd \
+        php8.3-intl \
+        php8.3-bcmath \
+        php8.3-opcache \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
 
-# Verify PHP and Nginx are installed during build
-RUN php -v && nginx -v
+# Install JupyterLab in an isolated Python environment
+RUN python3 -m venv /opt/jupyter && \
+    /opt/jupyter/bin/pip install --no-cache-dir \
+        jupyterlab \
+        jupyter-server \
+        ipykernel
 
-# Return to the normal Jupyter user
-USER ${NB_UID}
+ENV PATH="/opt/jupyter/bin:${PATH}"
 
-# Set working directory
-WORKDIR /home/jovyan
+# Create non-root user and directories
+RUN useradd -m -s /bin/bash jovyan && \
+    mkdir -p \
+        /home/jovyan/work \
+        /var/www/html \
+        /tmp/nginx-client \
+        /tmp/nginx-proxy \
+        /tmp/nginx-fastcgi \
+        /run/php \
+    && chown -R jovyan:jovyan \
+        /home/jovyan \
+        /var/www/html \
+        /run/php
 
-# Render web service port
+# Configure PHP-FPM to run without root privileges
+RUN sed -i \
+        's|^listen = .*|listen = 127.0.0.1:9000|' \
+        /etc/php/8.3/fpm/pool.d/www.conf && \
+    sed -i \
+        's|^user = .*|user = jovyan|' \
+        /etc/php/8.3/fpm/pool.d/www.conf && \
+    sed -i \
+        's|^group = .*|group = jovyan|' \
+        /etc/php/8.3/fpm/pool.d/www.conf && \
+    sed -i \
+        's|^;*daemonize = .*|daemonize = no|' \
+        /etc/php/8.3/fpm/php-fpm.conf && \
+    printf '\n[global]\npid = /tmp/php-fpm.pid\n' \
+        >> /etc/php/8.3/fpm/php-fpm.conf
+
+# Copy Nginx configuration and website files
+COPY nginx.conf /etc/nginx/nginx.conf
+COPY website/ /var/www/html/
+
+# Copy startup script
+COPY start.sh /usr/local/bin/start.sh
+
+RUN chmod +x /usr/local/bin/start.sh && \
+    chown -R jovyan:jovyan /var/www/html
+
+# Use non-root user
+USER jovyan
+
+WORKDIR /home/jovyan/work
+
 EXPOSE 10000
 
-# Start Jupyter Notebook
-CMD ["start-notebook.py", \
-     "--ServerApp.ip=0.0.0.0", \
-     "--ServerApp.port=10000", \
-     "--ServerApp.allow_remote_access=True", \
-     "--ServerApp.root_dir=/home/jovyan/work"]
+ENTRYPOINT ["/usr/bin/tini", "--"]
+
+CMD ["/usr/local/bin/start.sh"]
